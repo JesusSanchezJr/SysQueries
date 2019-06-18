@@ -1,0 +1,176 @@
+
+
+/**********************************
+Generate a Table Listing W/ Schema
+
+Result Set: 
+SchemaName, TableName, Created Date. 
+
+Filter: 
+User tables Only 
+**********************************/
+
+SELECT
+		TABLE_SCHEMA
+		,TABLE_NAME
+
+FROM
+        INFORMATION_SCHEMA.TABLES
+
+/**********************************
+Generate a Stored Proc Listing
+
+Result Set: 
+SchemaName, ProcName, Created Date. 
+
+Filter - Exclude Microsoft Objects (there is a column for this)
+**********************************/
+
+SELECT	SPECIFIC_SCHEMA, 
+	SPECIFIC_NAME, 
+	CREATED
+
+InFROM	INFORMATION_SCHEMA.ROUTINES
+
+WHERE	ROUTINE_TYPE = 'PROCEDURE'
+
+/**********************************
+Generate an Object Count
+
+Result Set
+Object Type, Count
+
+Filter - Exclude Microsoft Objects (there is a column for this) 
+**********************************/
+
+SELECT xtype AS Type
+	  , name
+	  , COUNT(*) AS ObjTypeCount 
+FROM sys.sysobjects
+ GROUP BY xtype
+
+/**********************************
+Table listing w/ Columns
+
+Result Set: 
+
+Schema Name, Table Name, Column Name, Column Data Type, Column Ordinal (
+**********************************/
+
+SELECT  TABLE_SCHEMA ,
+        TABLE_NAME ,
+        COLUMN_NAME ,
+        DATA_TYPE ,
+	    ORDINAL_POSITION
+
+FROM   INFORMATION_SCHEMA.COLUMNS;
+
+/**********************************
+List Database Files along with Path Info
+Result Set: 
+
+Database Name, Logical File name, Physical File Name
+**********************************/
+SELECT  FILE_ID AS Name ,
+		name AS LogicalFileName ,
+		physical_name
+
+FROM sys.database_files
+
+
+/**********************************
+Show Active Connections 
+Result Set: 
+
+SPID, Login, Database, LastBatch Time
+
+Filter: Exclude System SPIDs (need to figure out how to do that)
+**********************************/
+
+SELECT   
+    c.net_transport, c.encrypt_option,   
+    c.auth_scheme, s.host_name, s.program_name,   
+    s.login_name, s.nt_domain,   
+    s.nt_user_name, s.original_login_name, c.connect_time,   
+    s.login_time   
+FROM sys.dm_exec_connections AS c  
+JOIN sys.dm_exec_sessions AS s  
+    ON c.session_id = s.session_id  
+/*
+WHERE c.session_id = @@SPID; 
+*/
+/**********************************
+Connection Count By Database
+
+Result Set: 
+Database, Connections (count of spids)
+
+Filter: Exclude System SPIDs (need to figure out how to do that)
+**********************************/
+
+SELECT  DB_NAME(dbid) AS DBName,
+	    COUNT(dbid) AS NumberOfConnections,
+		loginame
+FROM  sys.sysprocesses
+GROUP BY dbid, 
+		 loginame
+ORDER BY DB_NAME(dbid)
+
+/**********************************
+Table Row Count
+
+Result Set: 
+Database Name, Schema Name, Table Name, Row Count
+**********************************/
+
+CREATE TABLE #TempTable
+(Name NVARCHAR(50),
+ SchemaName NVARCHAR(50),
+ TableName NVARCHAR(50),
+ TableCount int)
+
+
+SELECT *
+INTO #TemporaryTable
+FROM (SELECT
+	   TABLE_SCHEMA AS TableSchema,
+	   Table_Name AS TableName,
+	   COUNT([TABLE_NAME]) AS CountOfTables
+
+FROM INFORMATION_SCHEMA.COLUMNS
+GROUP BY TABLE_NAME, TABLE_SCHEMA
+
+) AS TemporaryData
+
+SELECT *
+FROM #TemporaryTable
+ORDER BY TableSchema
+
+/**************************************************************************
+Listing of Databases
+
+Result Set: 
+Server Name, Database Name
+
+**************************************************************************/
+
+SELECT	@@SERVERNAME AS ServerName, name 
+FROM	master.sys.databases
+
+/***************************************************************************
+Try and write a query / script that does to following. 
+
+ï	Gets a listing of all user tables
+ï	Create a temp table to capture schema/table/count
+ï	For each user table, get a count (like SELECT COUNT(1) FROM TABLE ) and insert the value into the temp table
+ï	Select the data from the temp table
+
+***************************************************************************/
+CREATE TABLE #counts
+(
+    table_name varchar(255),
+    row_count int
+)
+
+EXEC sp_MSForEachTable @command1='INSERT #counts (table_name, row_count) SELECT ''?'', COUNT(*) FROM ?'
+SELECT table_name, row_count FROM #counts ORDER BY table_name, row_count DESC
